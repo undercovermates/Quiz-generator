@@ -332,6 +332,12 @@
                     <option value="medium" selected>Medium</option>
                     <option value="hard">Hard</option>
                 </select>
+                <select id="sourceSelect">
+                    <option value="all" selected>All Sources</option>
+                    <option value="wikipedia">Wikipedia</option>
+                    <option value="google">Google</option>
+                    <option value="bing">Bing</option>
+                </select>
             </div>
             <div class="input-group">
                 <select id="questionCount">
@@ -407,6 +413,7 @@
                 const subject = document.getElementById('subjectInput').value.trim();
                 const difficulty = document.getElementById('difficultySelect').value;
                 const count = parseInt(document.getElementById('questionCount').value);
+                const source = document.getElementById('sourceSelect').value;
 
                 if (!subject) {
                     this.showError('Please enter a subject for your quiz.');
@@ -417,7 +424,7 @@
                 
                 try {
                     // Use web search to find information about the subject
-                    const searchResults = await this.performWebSearch(subject);
+                    const searchResults = await this.performWebSearch(subject, source);
                     const questions = await this.generateQuestionsFromSearchResults(searchResults, subject, difficulty, count);
                     
                     this.questions = questions;
@@ -439,55 +446,25 @@
                 }
             }
 
-            async performWebSearch(subject) {
+            async performWebSearch(subject, source) {
                 try {
-                    // Search for educational and factual content about the subject
-                    const searchQueries = [
-                        `${subject} facts education information`,
-                        `${subject} key concepts important points`,
-                        `${subject} study guide learning material`
-                    ];
+                    const response = await fetch('/api/search', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ query: subject, source: source }),
+                    });
 
-                    const allResults = [];
-                    
-                    for (const query of searchQueries) {
-                        try {
-                            // Simulate web search API call
-                            // In a real implementation, this would call your backend API that performs the web search
-                            const response = await this.simulateWebSearch(query);
-                            if (response && response.length > 0) {
-                                allResults.push(...response);
-                            }
-                        } catch (error) {
-                            console.warn('Search failed for query:', query);
-                        }
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch search results');
                     }
 
-                    return allResults.slice(0, 10); // Limit results for processing
+                    return await response.json();
                 } catch (error) {
                     console.error('Web search error:', error);
                     throw error;
                 }
-            }
-
-            async simulateWebSearch(query) {
-                // This simulates a web search API call
-                // In production, you would replace this with actual web search integration
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                
-                // Return simulated search results
-                return [
-                    {
-                        title: `Educational Content about ${query}`,
-                        snippet: `${query} involves multiple important concepts and applications. Key facts include various aspects that are fundamental to understanding this subject. Important characteristics define how ${query} works in practice.`,
-                        url: `https://example.com/education/${query.replace(/ /g, '-')}`
-                    },
-                    {
-                        title: `Study Guide: ${query}`,
-                        snippet: `This comprehensive guide covers essential information about ${query}. Students should understand the basic principles, applications, and significance in modern contexts.`,
-                        url: `https://example.com/study/${query.replace(/ /g, '-')}`
-                    }
-                ];
             }
 
             async generateQuestionsFromSearchResults(searchResults, subject, difficulty, count) {
@@ -615,234 +592,6 @@
                 };
             }
 
-            async createQuestions(subject, difficulty, count) {
-                try {
-                    // Search for educational content about the subject
-                    const searchResults = await this.searchForContent(subject);
-                    
-                    // Generate questions from the search results
-                    const questions = await this.generateQuestionsFromContent(searchResults, subject, difficulty, count);
-                    
-                    return questions;
-                } catch (error) {
-                    console.error('Error creating questions:', error);
-                    throw new Error('Failed to generate questions from search results');
-                }
-            }
-
-            async searchForContent(subject) {
-                try {
-                    // Search for educational content, facts, and information about the subject
-                    const searchQueries = [
-                        `${subject} facts education quiz questions`,
-                        `${subject} information study guide`,
-                        `${subject} key concepts important facts`,
-                        `${subject} educational content learning`
-                    ];
-
-                    const allResults = [];
-                    
-                    // Perform multiple searches to get diverse content
-                    for (const query of searchQueries.slice(0, 2)) { // Limit to 2 searches for performance
-                        try {
-                            const response = await fetch('/api/search', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({ query })
-                            });
-                            
-                            if (response.ok) {
-                                const results = await response.json();
-                                allResults.push(...results.slice(0, 5)); // Take top 5 results per search
-                            }
-                        } catch (searchError) {
-                            console.warn('Search failed for query:', query, searchError);
-                        }
-                    }
-
-                    return allResults;
-                } catch (error) {
-                    console.error('Search error:', error);
-                    // Fallback to generating questions without search results
-                    return [];
-                }
-            }
-
-            async generateQuestionsFromContent(searchResults, subject, difficulty, count) {
-                const questions = [];
-                
-                // If we have search results, use them to create more relevant questions
-                if (searchResults && searchResults.length > 0) {
-                    // Extract key information from search results
-                    const keyFacts = this.extractKeyFacts(searchResults, subject);
-                    
-                    // Generate questions based on the facts found
-                    for (let i = 0; i < count; i++) {
-                        const question = this.createQuestionFromFacts(keyFacts, subject, difficulty, i);
-                        questions.push(question);
-                    }
-                } else {
-                    // Fallback: generate generic questions
-                    for (let i = 0; i < count; i++) {
-                        questions.push(this.generateGenericQuestion(subject, difficulty, i + 1));
-                    }
-                }
-
-                return questions;
-            }
-
-            extractKeyFacts(searchResults, subject) {
-                const facts = [];
-                
-                searchResults.forEach(result => {
-                    if (result.snippet) {
-                        // Extract sentences that seem to contain factual information
-                        const sentences = result.snippet.split(/[.!?]+/).filter(s => s.length > 20);
-                        sentences.forEach(sentence => {
-                            sentence = sentence.trim();
-                            if (sentence && this.isFactualSentence(sentence, subject)) {
-                                facts.push({
-                                    fact: sentence,
-                                    source: result.title || 'Web Source',
-                                    url: result.url
-                                });
-                            }
-                        });
-                    }
-                });
-
-                return facts.slice(0, 20); // Limit to top 20 facts
-            }
-
-            isFactualSentence(sentence, subject) {
-                // Simple heuristics to identify factual sentences
-                const factualIndicators = [
-                    'is', 'are', 'was', 'were', 'contains', 'includes', 'consists',
-                    'measures', 'weighs', 'discovered', 'invented', 'created',
-                    'known for', 'famous for', 'characterized by', 'defined as'
-                ];
-                
-                const lowerSentence = sentence.toLowerCase();
-                const lowerSubject = subject.toLowerCase();
-                
-                return lowerSentence.includes(lowerSubject) && 
-                       factualIndicators.some(indicator => lowerSentence.includes(indicator)) &&
-                       sentence.length > 30 && sentence.length < 200;
-            }
-
-            createQuestionFromFacts(facts, subject, difficulty, questionIndex) {
-                if (facts.length === 0) {
-                    return this.generateGenericQuestion(subject, difficulty, questionIndex + 1);
-                }
-
-                const fact = facts[questionIndex % facts.length];
-                const factText = fact.fact;
-                
-                // Try to create a question from the fact
-                const question = this.generateQuestionFromFact(factText, subject, difficulty);
-                
-                return {
-                    ...question,
-                    source: fact.source,
-                    explanation: question.explanation + ` (Source: ${fact.source})`
-                };
-            }
-
-            generateQuestionFromFact(factText, subject, difficulty) {
-                // Simple question generation from facts
-                // In a real implementation, this would use more sophisticated NLP
-                
-                const templates = [
-                    {
-                        pattern: /(\w+)\s+is\s+([^,.]+)/i,
-                        questionTemplate: "What is $1?",
-                        correctAnswer: "$2"
-                    },
-                    {
-                        pattern: /(\w+)\s+are\s+([^,.]+)/i,
-                        questionTemplate: "What are $1?",
-                        correctAnswer: "$2"
-                    },
-                    {
-                        pattern: /(\w+)\s+contains\s+([^,.]+)/i,
-                        questionTemplate: "What does $1 contain?",
-                        correctAnswer: "$2"
-                    }
-                ];
-
-                // Try to match patterns and generate questions
-                for (const template of templates) {
-                    const match = factText.match(template.pattern);
-                    if (match) {
-                        const question = template.questionTemplate.replace('$1', match[1]);
-                        const correctAnswer = template.correctAnswer.replace('$2', match[2]);
-                        
-                        return {
-                            question: question,
-                            options: this.generateOptionsForAnswer(correctAnswer, difficulty),
-                            correct: 0, // Correct answer is always first, then shuffled
-                            explanation: `Based on the fact: ${factText.substring(0, 100)}...`
-                        };
-                    }
-                }
-
-                // Fallback: create a generic question about the subject
-                return this.generateGenericQuestion(subject, difficulty, 1);
-            }
-
-            generateOptionsForAnswer(correctAnswer, difficulty) {
-                const options = [correctAnswer.trim()];
-                
-                // Generate plausible distractors based on difficulty
-                const distractors = this.generateDistractors(correctAnswer, difficulty);
-                options.push(...distractors);
-                
-                // Shuffle options
-                for (let i = options.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [options[i], options[j]] = [options[j], options[i]];
-                    
-                    // Keep track of where the correct answer ended up
-                    if (j === 0) {
-                        return { options, correctIndex: i };
-                    } else if (i === 0) {
-                        return { options, correctIndex: j };
-                    }
-                }
-                
-                // Find where the correct answer is now
-                const correctIndex = options.indexOf(correctAnswer.trim());
-                
-                return { 
-                    options: options.slice(0, 4), 
-                    correctIndex: correctIndex >= 0 ? correctIndex : 0 
-                };
-            }
-
-            generateDistractors(correctAnswer, difficulty) {
-                // Simple distractor generation
-                const distractors = [];
-                const baseWords = correctAnswer.split(' ');
-                
-                // Generate variations
-                if (difficulty === 'easy') {
-                    distractors.push('Not ' + correctAnswer);
-                    distractors.push('Opposite of ' + correctAnswer);
-                    distractors.push('Similar to ' + correctAnswer);
-                } else if (difficulty === 'medium') {
-                    distractors.push(baseWords[0] + ' alternative');
-                    distractors.push('Related ' + correctAnswer);
-                    distractors.push('Modified ' + correctAnswer);
-                } else {
-                    distractors.push('Complex ' + correctAnswer);
-                    distractors.push('Advanced ' + correctAnswer);
-                    distractors.push('Specialized ' + correctAnswer);
-                }
-                
-                return distractors.slice(0, 3);
-            }
 
             generateGenericQuestion(subject, difficulty, questionNum) {
                 const questionTypes = [
