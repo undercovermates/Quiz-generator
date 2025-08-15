@@ -512,85 +512,40 @@
             }
 
             createQuestionFromExtractedInfo(info, subject, difficulty, questionIndex) {
-                const allInfo = [...info.facts, ...info.concepts, ...info.applications];
+                const allSentences = [...info.facts, ...info.concepts, ...info.applications];
                 
-                if (allInfo.length === 0) {
+                if (allSentences.length < 4) {
                     return this.generateGenericQuestion(subject, difficulty, questionIndex + 1);
                 }
 
-                const questionTypes = [
-                    {
-                        template: `What is a key aspect of ${subject}?`,
-                        answerBase: `${subject} involves important concepts and principles`
-                    },
-                    {
-                        template: `Which statement about ${subject} is most accurate?`,
-                        answerBase: `${subject} has significant applications and relevance`
-                    },
-                    {
-                        template: `What should you know about ${subject}?`,
-                        answerBase: `${subject} encompasses various important elements`
-                    },
-                    {
-                        template: `How is ${subject} best characterized?`,
-                        answerBase: `${subject} is a complex field with multiple dimensions`
-                    }
-                ];
-
-                const questionType = questionTypes[questionIndex % questionTypes.length];
+                // Get a random set of unique sentences for options
+                const shuffledSentences = allSentences.sort(() => 0.5 - Math.random());
+                const uniqueSentences = [...new Set(shuffledSentences)];
                 
-                // Generate options with varying difficulty
-                const options = this.generateOptionsBasedOnDifficulty(subject, difficulty, questionType.answerBase);
-                
-                return {
-                    question: questionType.template,
-                    options: options.choices,
-                    correct: options.correctIndex,
-                    explanation: `Based on educational sources, ${subject} involves multiple important aspects and applications. Understanding these foundational elements is key to mastering the subject.`,
-                    source: 'Educational Web Sources'
-                };
-            }
-
-            generateOptionsBasedOnDifficulty(subject, difficulty, correctBase) {
-                let options = [];
-                
-                if (difficulty === 'easy') {
-                    options = [
-                        correctBase,
-                        `${subject} is completely simple and basic`,
-                        `${subject} has no real applications`,
-                        `${subject} is outdated and irrelevant`
-                    ];
-                } else if (difficulty === 'medium') {
-                    options = [
-                        correctBase,
-                        `${subject} only applies to theoretical situations`,
-                        `${subject} is limited to academic study`,
-                        `${subject} has minimal practical value`
-                    ];
-                } else { // hard
-                    options = [
-                        correctBase,
-                        `${subject} primarily focuses on historical perspectives`,
-                        `${subject} is mainly concerned with basic definitions`,
-                        `${subject} emphasizes memorization over understanding`
-                    ];
+                if (uniqueSentences.length < 4) {
+                    return this.generateGenericQuestion(subject, difficulty, questionIndex + 1);
                 }
 
-                // Shuffle options and track correct answer position
+                const options = uniqueSentences.slice(0, 4);
                 const correctAnswer = options[0];
+
+                // Shuffle the options so the correct answer isn't always first
                 for (let i = options.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [options[i], options[j]] = [options[j], options[i]];
                 }
 
                 const correctIndex = options.indexOf(correctAnswer);
-                
+
                 return {
-                    choices: options,
-                    correctIndex: correctIndex
+                    question: `Which of the following statements about "${subject}" is most accurate?`,
+                    options: options,
+                    correct: correctIndex,
+                    explanation: `This information is based on web search results. The correct statement is: "${correctAnswer}"`,
+                    source: 'Web Search Results'
                 };
             }
+
 
 
             generateGenericQuestion(subject, difficulty, questionNum) {
