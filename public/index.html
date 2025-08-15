@@ -301,15 +301,15 @@
                 padding: 20px;
                 margin: 10px;
             }
-            
+
             .header h1 {
                 font-size: 2rem;
             }
-            
+
             .input-group {
                 flex-direction: column;
             }
-            
+
             .quiz-controls {
                 flex-direction: column;
                 align-items: stretch;
@@ -331,12 +331,6 @@
                     <option value="easy">Easy</option>
                     <option value="medium" selected>Medium</option>
                     <option value="hard">Hard</option>
-                </select>
-                <select id="sourceSelect">
-                    <option value="all" selected>All Sources</option>
-                    <option value="wikipedia">Wikipedia</option>
-                    <option value="google">Google</option>
-                    <option value="bing">Bing</option>
                 </select>
             </div>
             <div class="input-group">
@@ -394,7 +388,7 @@
                 this.score = 0;
                 this.selectedAnswer = null;
                 this.answered = false;
-                
+
                 this.initializeEventListeners();
             }
 
@@ -403,7 +397,7 @@
                 document.getElementById('nextBtn').addEventListener('click', () => this.nextQuestion());
                 document.getElementById('restartBtn').addEventListener('click', () => this.restart());
                 document.getElementById('showExplanationBtn').addEventListener('click', () => this.toggleExplanation());
-                
+
                 document.getElementById('subjectInput').addEventListener('keypress', (e) => {
                     if (e.key === 'Enter') this.generateQuiz();
                 });
@@ -411,9 +405,8 @@
 
             async generateQuiz() {
                 const subject = document.getElementById('subjectInput').value.trim();
-                const difficulty = document.getElementById('difficultySelect').value;
                 const count = parseInt(document.getElementById('questionCount').value);
-                const source = document.getElementById('sourceSelect').value;
+                const difficulty = document.getElementById('difficultySelect').value;
 
                 if (!subject) {
                     this.showError('Please enter a subject for your quiz.');
@@ -421,39 +414,28 @@
                 }
 
                 this.showLoading();
-                
+
                 try {
                     // Use web search to find information about the subject
-                    const searchResults = await this.performWebSearch(subject, source);
-                    const questions = await this.generateQuestionsFromSearchResults(searchResults, subject, difficulty, count);
-                    
-                    this.questions = questions;
+                    const searchResults = await this.performWebSearch(subject, difficulty, count);
+
+                    // The backend now returns the questions directly
+                    this.questions = searchResults;
                     this.startQuiz();
                 } catch (error) {
                     console.error('Quiz generation error:', error);
-                    // Try fallback method with generic questions
-                    try {
-                        console.log('Attempting fallback question generation...');
-                        const fallbackQuestions = [];
-                        for (let i = 0; i < count; i++) {
-                            fallbackQuestions.push(this.generateGenericQuestion(subject, difficulty, i + 1));
-                        }
-                        this.questions = fallbackQuestions;
-                        this.startQuiz();
-                    } catch (fallbackError) {
-                        this.showError('Failed to generate quiz. Please try a different subject or check your connection.');
-                    }
+                    this.showError('Failed to generate quiz. Please try a different subject or check your connection.');
                 }
             }
 
-            async performWebSearch(subject, source) {
+            async performWebSearch(subject, difficulty, count) {
                 try {
                     const response = await fetch('/api/search', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify({ query: subject, source: source }),
+                        body: JSON.stringify({ query: subject, difficulty: difficulty, count: count }),
                     });
 
                     if (!response.ok) {
@@ -467,142 +449,15 @@
                 }
             }
 
-            async generateQuestionsFromSearchResults(searchResults, subject, difficulty, count) {
-                const questions = [];
-                
-                // Extract key information from search results
-                const extractedInfo = this.extractInformationFromResults(searchResults, subject);
-                
-                // Generate questions based on the extracted information
-                for (let i = 0; i < count; i++) {
-                    const question = this.createQuestionFromExtractedInfo(extractedInfo, subject, difficulty, i);
-                    questions.push(question);
-                }
-
-                return questions;
-            }
-
-            extractInformationFromResults(results, subject) {
-                const information = {
-                    facts: [],
-                    concepts: [],
-                    applications: []
-                };
-
-                results.forEach(result => {
-                    if (result.snippet) {
-                        const sentences = result.snippet.split(/[.!?]+/).filter(s => s.trim().length > 15);
-                        
-                        sentences.forEach(sentence => {
-                            sentence = sentence.trim();
-                            if (sentence) {
-                                if (sentence.toLowerCase().includes('important') || sentence.toLowerCase().includes('key')) {
-                                    information.concepts.push(sentence);
-                                } else if (sentence.toLowerCase().includes('application') || sentence.toLowerCase().includes('used')) {
-                                    information.applications.push(sentence);
-                                } else {
-                                    information.facts.push(sentence);
-                                }
-                            }
-                        });
-                    }
-                });
-
-                return information;
-            }
-
-            createQuestionFromExtractedInfo(info, subject, difficulty, questionIndex) {
-                const allSentences = [...info.facts, ...info.concepts, ...info.applications];
-                
-                if (allSentences.length < 4) {
-                    return this.generateGenericQuestion(subject, difficulty, questionIndex + 1);
-                }
-
-                // Get a random set of unique sentences for options
-                const shuffledSentences = allSentences.sort(() => 0.5 - Math.random());
-                const uniqueSentences = [...new Set(shuffledSentences)];
-                
-                if (uniqueSentences.length < 4) {
-                    return this.generateGenericQuestion(subject, difficulty, questionIndex + 1);
-                }
-
-                const options = uniqueSentences.slice(0, 4);
-                const correctAnswer = options[0];
-
-                // Shuffle the options so the correct answer isn't always first
-                for (let i = options.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [options[i], options[j]] = [options[j], options[i]];
-                }
-
-                const correctIndex = options.indexOf(correctAnswer);
-
-                return {
-                    question: `Which of the following statements about "${subject}" is most accurate?`,
-                    options: options,
-                    correct: correctIndex,
-                    explanation: `This information is based on web search results. The correct statement is: "${correctAnswer}"`,
-                    source: 'Web Search Results'
-                };
-            }
-
-
-
-            generateGenericQuestion(subject, difficulty, questionNum) {
-                const questionTypes = [
-                    {
-                        template: `What is a key characteristic of ${subject}?`,
-                        options: [
-                            `${subject} has multiple important aspects`,
-                            `${subject} is completely theoretical`,
-                            `${subject} has no practical value`,
-                            `${subject} is outdated`
-                        ],
-                        correct: 0,
-                        explanation: `${subject} typically has various important characteristics and applications.`
-                    },
-                    {
-                        template: `Which statement best describes ${subject}?`,
-                        options: [
-                            `${subject} is a complex field with many applications`,
-                            `${subject} is simple and straightforward`,
-                            `${subject} has no real-world use`,
-                            `${subject} is only theoretical`
-                        ],
-                        correct: 0,
-                        explanation: `Most subjects, including ${subject}, tend to be complex with various practical applications.`
-                    },
-                    {
-                        template: `What is most important to understand about ${subject}?`,
-                        options: [
-                            `Its fundamental principles and applications`,
-                            `Only its historical context`,
-                            `Just memorizing facts`,
-                            `It's not worth studying`
-                        ],
-                        correct: 0,
-                        explanation: `Understanding both the fundamental principles and practical applications provides the best foundation for learning about ${subject}.`
-                    }
-                ];
-
-                const questionType = questionTypes[questionNum % questionTypes.length];
-                
-                return {
-                    question: questionType.template,
-                    options: questionType.options,
-                    correct: questionType.correct,
-                    explanation: questionType.explanation
-                };
-            }
 
             startQuiz() {
                 document.getElementById('inputSection').style.display = 'none';
                 document.getElementById('loadingSection').style.display = 'none';
                 document.getElementById('errorSection').style.display = 'none';
                 document.getElementById('quizContainer').style.display = 'block';
-                
+
                 document.getElementById('quizTitle').textContent = document.getElementById('subjectInput').value + ' Quiz';
-                
+
                 this.currentQuestion = 0;
                 this.score = 0;
                 this.showQuestion();
@@ -611,15 +466,15 @@
             showQuestion() {
                 const question = this.questions[this.currentQuestion];
                 const totalQuestions = this.questions.length;
-                
+
                 document.getElementById('questionNumber').textContent = `Question ${this.currentQuestion + 1}`;
                 document.getElementById('quizInfo').textContent = `Question ${this.currentQuestion + 1} of ${totalQuestions}`;
                 document.getElementById('progressFill').style.width = `${((this.currentQuestion + 1) / totalQuestions) * 100}%`;
                 document.getElementById('questionText').textContent = question.question;
-                
+
                 const optionsContainer = document.getElementById('optionsContainer');
                 optionsContainer.innerHTML = '';
-                
+
                 question.options.forEach((option, index) => {
                     const optionElement = document.createElement('div');
                     optionElement.className = 'option';
@@ -640,13 +495,13 @@
 
                 document.querySelectorAll('.option').forEach(opt => opt.classList.remove('selected'));
                 optionElement.classList.add('selected');
-                
+
                 this.selectedAnswer = answerIndex;
                 this.answered = true;
-                
+
                 const question = this.questions[this.currentQuestion];
                 const isCorrect = answerIndex === question.correct;
-                
+
                 if (isCorrect) {
                     this.score++;
                     optionElement.classList.add('correct');
@@ -663,7 +518,7 @@
             toggleExplanation() {
                 const explanation = document.getElementById('explanation');
                 const btn = document.getElementById('showExplanationBtn');
-                
+
                 if (explanation.style.display === 'none' || explanation.style.display === '') {
                     explanation.style.display = 'block';
                     btn.textContent = 'Hide Explanation';
@@ -685,16 +540,16 @@
             showResults() {
                 document.getElementById('quizContainer').style.display = 'none';
                 document.getElementById('resultsSection').style.display = 'block';
-                
+
                 const percentage = Math.round((this.score / this.questions.length) * 100);
                 document.getElementById('finalScore').textContent = `${this.score}/${this.questions.length}`;
-                
+
                 let message = '';
                 if (percentage >= 80) message = 'Excellent! You really know your stuff!';
                 else if (percentage >= 60) message = 'Good job! Keep up the learning!';
                 else if (percentage >= 40) message = 'Not bad! There\'s room for improvement.';
                 else message = 'Keep studying and try again!';
-                
+
                 document.getElementById('scoreMessage').textContent = message;
             }
 

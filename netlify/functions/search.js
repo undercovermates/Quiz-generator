@@ -1,109 +1,90 @@
 const fetch = require('node-fetch');
+const { OpenAI } = require('openai');
 
-// --- Configuration for Search APIs ---
-const GOOGLE_API_KEY = 'YOUR_GOOGLE_API_KEY';
-const GOOGLE_CX = 'YOUR_GOOGLE_CX';
-const BING_API_KEY = 'YOUR_BING_API_KEY';
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY || 'YOUR_OPENAI_API_KEY',
+});
 
 async function searchWikipedia(query) {
     try {
-        const url = `https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(query)}&limit=10&namespace=0&format=json`;
+        const url = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&srlimit=1`;
         const response = await fetch(url);
         const data = await response.json();
-        const [, titles, snippets, urls] = data;
-        return titles.map((title, index) => ({
-            title: title,
-            snippet: snippets[index],
-            url: urls[index],
-        }));
+        const pageId = data.query.search[0].pageid;
+
+        const contentUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&pageids=${pageId}&explaintext&format=json`;
+        const contentResponse = await fetch(contentUrl);
+        const contentData = await contentResponse.json();
+        return contentData.query.pages[pageId].extract;
     } catch (error) {
         console.error('Wikipedia API error:', error);
-        return [];
+        return null;
     }
 }
 
-async function searchGoogle(query) {
-    if (GOOGLE_API_KEY === 'YOUR_GOOGLE_API_KEY' || GOOGLE_CX === 'YOUR_GOOGLE_CX') {
-        console.log('Google API key or CX not configured. Skipping Google search.');
+async function generateAiQuestions(content, difficulty, count) {
+    if (!content) {
         return [];
     }
-    try {
-        const url = `https://www.googleapis.com/customsearch/v1?key=${GOOGLE_API_KEY}&cx=${GOOGLE_CX}&q=${encodeURIComponent(query)}`;
-        const response = await fetch(url);
-        const data = await response.json();
-        if (!data.items) {
-            return [];
+
+    const prompt = `
+        Based on the following text, generate a JSON array of ${count} multiple-choice quiz questions.
+        The difficulty of the questions should be ${difficulty}.
+        Each question object in the array should have the following format:
+        {
+            "question": "The question text",
+            "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+            "correct": 0, // The index of the correct option in the "options" array
+            "explanation": "A brief explanation of why the answer is correct."
         }
-        return data.items.map(item => ({
-            title: item.title,
-            snippet: item.snippet,
-            url: item.link,
-        }));
-    } catch (error) {
-        console.error('Google Search API error:', error);
-        return [];
-    }
-}
 
-async function searchBing(query) {
-    if (BING_API_KEY === 'YOUR_BING_API_KEY') {
-        console.log('Bing API key not configured. Skipping Bing search.');
-        return [];
-    }
+        Here is the text to base the questions on:
+        ---
+        ${content.substring(0, 3000)}
+        ---
+    `;
+
     try {
-        const url = `https://api.bing.microsoft.com/v7.0/search?q=${encodeURIComponent(query)}`;
-        const response = await fetch(url, {
-            headers: { 'Ocp-Apim-Subscription-Key': BING_API_KEY },
+        const completion = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo",
+            messages: [{ role: "user", content: prompt }],
+            response_format: { type: "json_object" },
         });
-        const data = await response.json();
-        if (!data.webPages || !data.webPages.value) {
-            return [];
-        }
-        return data.webPages.value.map(item => ({
-            title: item.name,
-            snippet: item.snippet,
-            url: item.url,
-        }));
+
+        const result = JSON.parse(completion.choices[0].message.content);
+        // The prompt asks for an array, but the model might wrap it in a root key
+        return result.questions || result;
     } catch (error) {
-        console.error('Bing Search API error:', error);
+        console.error("OpenAI API error:", error);
         return [];
     }
 }
+
 
 exports.handler = async function(event, context) {
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
-    const { query, source } = JSON.parse(event.body);
+    const { query, difficulty, count } = JSON.parse(event.body);
 
     if (!query) {
         return { statusCode: 400, body: JSON.stringify({ error: 'Query is required' }) };
     }
 
-    console.log(`Search query received: "${query}" from source: "${source}"`);
+    console.log(`Search query received: "${query}" with difficulty: "${difficulty}"`);
 
-    let results = [];
     try {
-        if (source === 'google') {
-            results = await searchGoogle(query);
-        } else if (source === 'bing') {
-            results = await searchBing(query);
-        } else if (source === 'wikipedia') {
-            results = await searchWikipedia(query);
-        } else {
-            // Default or 'all' sources - try them in order
-            results = await searchWikipedia(query);
-            if (results.length === 0) {
-                results = await searchGoogle(query);
-            }
-            if (results.length === 0) {
-                results = await searchBing(query);
-            }
+        const wikipediaContent = await searchWikipedia(query);
+        if (!wikipediaContent) {
+            return { statusCode: 500, body: JSON.stringify({ error: 'Could not fetch content from Wikipedia.' }) };
         }
+
+        const questions = await generateAiQuestions(wikipediaContent, difficulty, count || 5);
+
         return {
             statusCode: 200,
-            body: JSON.stringify(results),
+            body: JSON.stringify(questions),
         };
     } catch (error) {
         console.error('An error occurred during search:', error);
