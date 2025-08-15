@@ -1,0 +1,14 @@
+{
+  "name": "ai-quiz-generator-backend",
+  "version": "1.0.0",
+  "description": "Backend for the AI Quiz Generator",
+  "main": "search.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "node-fetch": "^2.6.7"
+  },
+  "author": "",
+  "license": "ISC"
+}
