@@ -421,10 +421,16 @@
 
                     // The backend now returns the questions directly
                     this.questions = searchResults;
+
+                    if (this.questions.length === 0) {
+                        this.showError('Could not generate questions for that subject. Please try another topic.');
+                        return;
+                    }
+
                     this.startQuiz();
                 } catch (error) {
                     console.error('Quiz generation error:', error);
-                    this.showError('Failed to generate quiz. Please try a different subject or check your connection.');
+                    this.showError(error.message || 'An unexpected error occurred.');
                 }
             }
 
@@ -439,7 +445,8 @@
                     });
 
                     if (!response.ok) {
-                        throw new Error('Failed to fetch search results');
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Failed to fetch search results');
                     }
 
                     return await response.json();

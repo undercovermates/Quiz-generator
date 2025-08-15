@@ -10,6 +10,9 @@ async function searchWikipedia(query) {
         const url = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&srlimit=1`;
         const response = await fetch(url);
         const data = await response.json();
+        if (!data.query.search || data.query.search.length === 0) {
+            return null;
+        }
         const pageId = data.query.search[0].pageid;
 
         const contentUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&pageids=${pageId}&explaintext&format=json`;
@@ -22,13 +25,53 @@ async function searchWikipedia(query) {
     }
 }
 
-async function generateAiQuestions(content, difficulty, count) {
+function generateRuleBasedQuestions(content, count) {
     if (!content) {
         return [];
     }
 
+    const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 20);
+    if (sentences.length < 4) {
+        return [];
+    }
+
+    const questions = [];
+    for (let i = 0; i < count; i++) {
+        const shuffledSentences = sentences.sort(() => 0.5 - Math.random());
+        const uniqueSentences = [...new Set(shuffledSentences)];
+
+        if (uniqueSentences.length < 4) {
+            continue;
+        }
+
+        const options = uniqueSentences.slice(0, 4);
+        const correctAnswer = options[0];
+
+        for (let i = options.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [options[i], options[j]] = [options[j], options[i]];
+        }
+
+        const correctIndex = options.indexOf(correctAnswer);
+
+        questions.push({
+            question: "Which of the following statements is most accurate?",
+            options: options,
+            correct: correctIndex,
+            explanation: `This information is based on web search results. The correct statement is: "${correctAnswer}"`,
+        });
+    }
+    return questions;
+}
+
+async function generateAiQuestions(content, difficulty, count) {
+    if (!content || !process.env.OPENAI_API_KEY && openai.apiKey === 'YOUR_OPENAI_API_KEY') {
+        console.log('OpenAI API key not configured or content is empty. Skipping AI generation.');
+        return [];
+    }
+
     const prompt = `
-        Based on the following text, generate a JSON array of ${count} multiple-choice quiz questions.
+        Based on the following text, generate a JSON object containing a "questions" key, which is an array of ${count} multiple-choice quiz questions.
         The difficulty of the questions should be ${difficulty}.
         Each question object in the array should have the following format:
         {
@@ -52,14 +95,12 @@ async function generateAiQuestions(content, difficulty, count) {
         });
 
         const result = JSON.parse(completion.choices[0].message.content);
-        // The prompt asks for an array, but the model might wrap it in a root key
-        return result.questions || result;
+        return result.questions || [];
     } catch (error) {
         console.error("OpenAI API error:", error);
         return [];
     }
 }
-
 
 exports.handler = async function(event, context) {
     if (event.httpMethod !== 'POST') {
@@ -67,6 +108,7 @@ exports.handler = async function(event, context) {
     }
 
     const { query, difficulty, count } = JSON.parse(event.body);
+    const questionCount = count || 5;
 
     if (!query) {
         return { statusCode: 400, body: JSON.stringify({ error: 'Query is required' }) };
@@ -77,10 +119,19 @@ exports.handler = async function(event, context) {
     try {
         const wikipediaContent = await searchWikipedia(query);
         if (!wikipediaContent) {
-            return { statusCode: 500, body: JSON.stringify({ error: 'Could not fetch content from Wikipedia.' }) };
+            return { statusCode: 404, body: JSON.stringify({ error: 'Could not find a Wikipedia article for that subject.' }) };
         }
 
-        const questions = await generateAiQuestions(wikipediaContent, difficulty, count || 5);
+        let questions = await generateAiQuestions(wikipediaContent, difficulty, questionCount);
+
+        if (questions.length === 0) {
+            console.log('AI question generation failed. Falling back to rule-based generation.');
+            questions = generateRuleBasedQuestions(wikipediaContent, questionCount);
+        }
+
+        if (questions.length === 0) {
+            return { statusCode: 500, body: JSON.stringify({ error: 'Could not generate questions for that subject.' }) };
+        }
 
         return {
             statusCode: 200,
