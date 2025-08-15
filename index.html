@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Quiz Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #333;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            max-width: 800px;
+            width: 90%;
+            margin: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .input-section {
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        input[type="text"], select {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            min-width: 200px;
+        }
+
+        input[type="text"]:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .generate-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 150px;
+        }
+
+        .generate-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+
+        .generate-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+            font-weight: 500;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .quiz-container {
+            display: none;
+        }
+
+        .quiz-header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .quiz-header h2 {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+        }
+
+        .progress-bar {
+            background: rgba(255, 255, 255, 0.2);
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 15px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            transition: width 0.3s ease;
+            border-radius: 4px;
+        }
+
+        .question-card {
+            background: white;
+            border: 2px solid #e1e5e9;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .question-number {
+            color: #667eea;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+        }
+
+        .question-text {
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            line-height: 1.5;
+            color: #2d3748;
+        }
+
+        .options {
+            display: grid;
+            gap: 12px;
+        }
+
+        .option {
+            background: #f8f9fa;
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+        }
+
+        .option:hover {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.05);
+        }
+
+        .option.selected {
+            background: rgba(102, 126, 234, 0.1);
+            border-color: #667eea;
+        }
+
+        .option.correct {
+            background: rgba(72, 187, 120, 0.1);
+            border-color: #48bb78;
+        }
+
+        .option.incorrect {
+            background: rgba(245, 101, 101, 0.1);
+            border-color: #f56565;
+        }
+
+        .quiz-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 25px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .next-btn, .restart-btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .next-btn:hover, .restart-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .next-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .results {
+            text-align: center;
+            padding: 30px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 15px;
+            margin-top: 20px;
+        }
+
+        .results h2 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+        }
+
+        .score {
+            font-size: 3rem;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+
+        .explanation {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(102, 126, 234, 0.1);
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            text-align: left;
+            display: none;
+        }
+
+        .show-explanation {
+            background: none;
+            border: 1px solid #667eea;
+            color: #667eea;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .error {
+            background: rgba(245, 101, 101, 0.1);
+            border: 1px solid #f56565;
+            color: #c53030;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .input-group {
+                flex-direction: column;
+            }
+            
+            .quiz-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧠 AI Quiz Generator</h1>
+            <p>Test your knowledge on any subject with AI-generated questions</p>
+        </div>
+
+        <div class="input-section" id="inputSection">
+            <div class="input-group">
+                <input type="text" id="subjectInput" placeholder="Enter any subject (e.g., 'Solar System', 'World War II', 'JavaScript')" />
+                <select id="difficultySelect">
+                    <option value="easy">Easy</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="hard">Hard</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <select id="questionCount">
+                    <option value="5" selected>5 Questions</option>
+                    <option value="10">10 Questions</option>
+                    <option value="15">15 Questions</option>
+                </select>
+                <button class="generate-btn" id="generateBtn">Generate Quiz</button>
+            </div>
+        </div>
+
+        <div class="loading" id="loadingSection" style="display: none;">
+            <div class="spinner"></div>
+            <p>Generating your quiz...</p>
+        </div>
+
+        <div class="error" id="errorSection" style="display: none;"></div>
+
+        <div class="quiz-container" id="quizContainer">
+            <div class="quiz-header">
+                <h2 id="quizTitle">Quiz Title</h2>
+                <p id="quizInfo">Question 1 of 5</p>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 20%;"></div>
+                </div>
+            </div>
+
+            <div class="question-card">
+                <div class="question-number" id="questionNumber">Question 1</div>
+                <div class="question-text" id="questionText"></div>
+                <div class="options" id="optionsContainer"></div>
+                <div class="explanation" id="explanation"></div>
+            </div>
+
+            <div class="quiz-controls">
+                <button class="show-explanation" id="showExplanationBtn" style="display: none;">Show Explanation</button>
+                <button class="next-btn" id="nextBtn" disabled>Next Question</button>
+            </div>
+        </div>
+
+        <div class="results" id="resultsSection" style="display: none;">
+            <h2>Quiz Complete!</h2>
+            <div class="score" id="finalScore">8/10</div>
+            <p id="scoreMessage">Great job!</p>
+            <button class="restart-btn" id="restartBtn">Create New Quiz</button>
+        </div>
+    </div>
+
+    <script>
+        class QuizGenerator {
+            constructor() {
+                this.questions = [];
+                this.currentQuestion = 0;
+                this.score = 0;
+                this.selectedAnswer = null;
+                this.answered = false;
+                
+                this.initializeEventListeners();
+            }
+
+            initializeEventListeners() {
+                document.getElementById('generateBtn').addEventListener('click', () => this.generateQuiz());
+                document.getElementById('nextBtn').addEventListener('click', () => this.nextQuestion());
+                document.getElementById('restartBtn').addEventListener('click', () => this.restart());
+                document.getElementById('showExplanationBtn').addEventListener('click', () => this.toggleExplanation());
+                
+                document.getElementById('subjectInput').addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.generateQuiz();
+                });
+            }
+
+            async generateQuiz() {
+                const subject = document.getElementById('subjectInput').value.trim();
+                const difficulty = document.getElementById('difficultySelect').value;
+                const count = parseInt(document.getElementById('questionCount').value);
+
+                if (!subject) {
+                    this.showError('Please enter a subject for your quiz.');
+                    return;
+                }
+
+                this.showLoading();
+                
+                try {
+                    // Use web search to find information about the subject
+                    const searchResults = await this.performWebSearch(subject);
+                    const questions = await this.generateQuestionsFromSearchResults(searchResults, subject, difficulty, count);
+                    
+                    this.questions = questions;
+                    this.startQuiz();
+                } catch (error) {
+                    console.error('Quiz generation error:', error);
+                    // Try fallback method with generic questions
+                    try {
+                        console.log('Attempting fallback question generation...');
+                        const fallbackQuestions = [];
+                        for (let i = 0; i < count; i++) {
+                            fallbackQuestions.push(this.generateGenericQuestion(subject, difficulty, i + 1));
+                        }
+                        this.questions = fallbackQuestions;
+                        this.startQuiz();
+                    } catch (fallbackError) {
+                        this.showError('Failed to generate quiz. Please try a different subject or check your connection.');
+                    }
+                }
+            }
+
+            async performWebSearch(subject) {
+                try {
+                    // Search for educational and factual content about the subject
+                    const searchQueries = [
+                        `${subject} facts education information`,
+                        `${subject} key concepts important points`,
+                        `${subject} study guide learning material`
+                    ];
+
+                    const allResults = [];
+                    
+                    for (const query of searchQueries) {
+                        try {
+                            // Simulate web search API call
+                            // In a real implementation, this would call your backend API that performs the web search
+                            const response = await this.simulateWebSearch(query);
+                            if (response && response.length > 0) {
+                                allResults.push(...response);
+                            }
+                        } catch (error) {
+                            console.warn('Search failed for query:', query);
+                        }
+                    }
+
+                    return allResults.slice(0, 10); // Limit results for processing
+                } catch (error) {
+                    console.error('Web search error:', error);
+                    throw error;
+                }
+            }
+
+            async simulateWebSearch(query) {
+                // This simulates a web search API call
+                // In production, you would replace this with actual web search integration
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Return simulated search results
+                return [
+                    {
+                        title: `Educational Content about ${query}`,
+                        snippet: `${query} involves multiple important concepts and applications. Key facts include various aspects that are fundamental to understanding this subject. Important characteristics define how ${query} works in practice.`,
+                        url: `https://example.com/education/${query.replace(/ /g, '-')}`
+                    },
+                    {
+                        title: `Study Guide: ${query}`,
+                        snippet: `This comprehensive guide covers essential information about ${query}. Students should understand the basic principles, applications, and significance in modern contexts.`,
+                        url: `https://example.com/study/${query.replace(/ /g, '-')}`
+                    }
+                ];
+            }
+
+            async generateQuestionsFromSearchResults(searchResults, subject, difficulty, count) {
+                const questions = [];
+                
+                // Extract key information from search results
+                const extractedInfo = this.extractInformationFromResults(searchResults, subject);
+                
+                // Generate questions based on the extracted information
+                for (let i = 0; i < count; i++) {
+                    const question = this.createQuestionFromExtractedInfo(extractedInfo, subject, difficulty, i);
+                    questions.push(question);
+                }
+
+                return questions;
+            }
+
+            extractInformationFromResults(results, subject) {
+                const information = {
+                    facts: [],
+                    concepts: [],
+                    applications: []
+                };
+
+                results.forEach(result => {
+                    if (result.snippet) {
+                        const sentences = result.snippet.split(/[.!?]+/).filter(s => s.trim().length > 15);
+                        
+                        sentences.forEach(sentence => {
+                            sentence = sentence.trim();
+                            if (sentence) {
+                                if (sentence.toLowerCase().includes('important') || sentence.toLowerCase().includes('key')) {
+                                    information.concepts.push(sentence);
+                                } else if (sentence.toLowerCase().includes('application') || sentence.toLowerCase().includes('used')) {
+                                    information.applications.push(sentence);
+                                } else {
+                                    information.facts.push(sentence);
+                                }
+                            }
+                        });
+                    }
+                });
+
+                return information;
+            }
+
+            createQuestionFromExtractedInfo(info, subject, difficulty, questionIndex) {
+                const allInfo = [...info.facts, ...info.concepts, ...info.applications];
+                
+                if (allInfo.length === 0) {
+                    return this.generateGenericQuestion(subject, difficulty, questionIndex + 1);
+                }
+
+                const questionTypes = [
+                    {
+                        template: `What is a key aspect of ${subject}?`,
+                        answerBase: `${subject} involves important concepts and principles`
+                    },
+                    {
+                        template: `Which statement about ${subject} is most accurate?`,
+                        answerBase: `${subject} has significant applications and relevance`
+                    },
+                    {
+                        template: `What should you know about ${subject}?`,
+                        answerBase: `${subject} encompasses various important elements`
+                    },
+                    {
+                        template: `How is ${subject} best characterized?`,
+                        answerBase: `${subject} is a complex field with multiple dimensions`
+                    }
+                ];
+
+                const questionType = questionTypes[questionIndex % questionTypes.length];
+                
+                // Generate options with varying difficulty
+                const options = this.generateOptionsBasedOnDifficulty(subject, difficulty, questionType.answerBase);
+                
+                return {
+                    question: questionType.template,
+                    options: options.choices,
+                    correct: options.correctIndex,
+                    explanation: `Based on educational sources, ${subject} involves multiple important aspects and applications. Understanding these foundational elements is key to mastering the subject.`,
+                    source: 'Educational Web Sources'
+                };
+            }
+
+            generateOptionsBasedOnDifficulty(subject, difficulty, correctBase) {
+                let options = [];
+                
+                if (difficulty === 'easy') {
+                    options = [
+                        correctBase,
+                        `${subject} is completely simple and basic`,
+                        `${subject} has no real applications`,
+                        `${subject} is outdated and irrelevant`
+                    ];
+                } else if (difficulty === 'medium') {
+                    options = [
+                        correctBase,
+                        `${subject} only applies to theoretical situations`,
+                        `${subject} is limited to academic study`,
+                        `${subject} has minimal practical value`
+                    ];
+                } else { // hard
+                    options = [
+                        correctBase,
+                        `${subject} primarily focuses on historical perspectives`,
+                        `${subject} is mainly concerned with basic definitions`,
+                        `${subject} emphasizes memorization over understanding`
+                    ];
+                }
+
+                // Shuffle options and track correct answer position
+                const correctAnswer = options[0];
+                for (let i = options.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [options[i], options[j]] = [options[j], options[i]];
+                }
+
+                const correctIndex = options.indexOf(correctAnswer);
+                
+                return {
+                    choices: options,
+                    correctIndex: correctIndex
+                };
+            }
+
+            async createQuestions(subject, difficulty, count) {
+                try {
+                    // Search for educational content about the subject
+                    const searchResults = await this.searchForContent(subject);
+                    
+                    // Generate questions from the search results
+                    const questions = await this.generateQuestionsFromContent(searchResults, subject, difficulty, count);
+                    
+                    return questions;
+                } catch (error) {
+                    console.error('Error creating questions:', error);
+                    throw new Error('Failed to generate questions from search results');
+                }
+            }
+
+            async searchForContent(subject) {
+                try {
+                    // Search for educational content, facts, and information about the subject
+                    const searchQueries = [
+                        `${subject} facts education quiz questions`,
+                        `${subject} information study guide`,
+                        `${subject} key concepts important facts`,
+                        `${subject} educational content learning`
+                    ];
+
+                    const allResults = [];
+                    
+                    // Perform multiple searches to get diverse content
+                    for (const query of searchQueries.slice(0, 2)) { // Limit to 2 searches for performance
+                        try {
+                            const response = await fetch('/api/search', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({ query })
+                            });
+                            
+                            if (response.ok) {
+                                const results = await response.json();
+                                allResults.push(...results.slice(0, 5)); // Take top 5 results per search
+                            }
+                        } catch (searchError) {
+                            console.warn('Search failed for query:', query, searchError);
+                        }
+                    }
+
+                    return allResults;
+                } catch (error) {
+                    console.error('Search error:', error);
+                    // Fallback to generating questions without search results
+                    return [];
+                }
+            }
+
+            async generateQuestionsFromContent(searchResults, subject, difficulty, count) {
+                const questions = [];
+                
+                // If we have search results, use them to create more relevant questions
+                if (searchResults && searchResults.length > 0) {
+                    // Extract key information from search results
+                    const keyFacts = this.extractKeyFacts(searchResults, subject);
+                    
+                    // Generate questions based on the facts found
+                    for (let i = 0; i < count; i++) {
+                        const question = this.createQuestionFromFacts(keyFacts, subject, difficulty, i);
+                        questions.push(question);
+                    }
+                } else {
+                    // Fallback: generate generic questions
+                    for (let i = 0; i < count; i++) {
+                        questions.push(this.generateGenericQuestion(subject, difficulty, i + 1));
+                    }
+                }
+
+                return questions;
+            }
+
+            extractKeyFacts(searchResults, subject) {
+                const facts = [];
+                
+                searchResults.forEach(result => {
+                    if (result.snippet) {
+                        // Extract sentences that seem to contain factual information
+                        const sentences = result.snippet.split(/[.!?]+/).filter(s => s.length > 20);
+                        sentences.forEach(sentence => {
+                            sentence = sentence.trim();
+                            if (sentence && this.isFactualSentence(sentence, subject)) {
+                                facts.push({
+                                    fact: sentence,
+                                    source: result.title || 'Web Source',
+                                    url: result.url
+                                });
+                            }
+                        });
+                    }
+                });
+
+                return facts.slice(0, 20); // Limit to top 20 facts
+            }
+
+            isFactualSentence(sentence, subject) {
+                // Simple heuristics to identify factual sentences
+                const factualIndicators = [
+                    'is', 'are', 'was', 'were', 'contains', 'includes', 'consists',
+                    'measures', 'weighs', 'discovered', 'invented', 'created',
+                    'known for', 'famous for', 'characterized by', 'defined as'
+                ];
+                
+                const lowerSentence = sentence.toLowerCase();
+                const lowerSubject = subject.toLowerCase();
+                
+                return lowerSentence.includes(lowerSubject) && 
+                       factualIndicators.some(indicator => lowerSentence.includes(indicator)) &&
+                       sentence.length > 30 && sentence.length < 200;
+            }
+
+            createQuestionFromFacts(facts, subject, difficulty, questionIndex) {
+                if (facts.length === 0) {
+                    return this.generateGenericQuestion(subject, difficulty, questionIndex + 1);
+                }
+
+                const fact = facts[questionIndex % facts.length];
+                const factText = fact.fact;
+                
+                // Try to create a question from the fact
+                const question = this.generateQuestionFromFact(factText, subject, difficulty);
+                
+                return {
+                    ...question,
+                    source: fact.source,
+                    explanation: question.explanation + ` (Source: ${fact.source})`
+                };
+            }
+
+            generateQuestionFromFact(factText, subject, difficulty) {
+                // Simple question generation from facts
+                // In a real implementation, this would use more sophisticated NLP
+                
+                const templates = [
+                    {
+                        pattern: /(\w+)\s+is\s+([^,.]+)/i,
+                        questionTemplate: "What is $1?",
+                        correctAnswer: "$2"
+                    },
+                    {
+                        pattern: /(\w+)\s+are\s+([^,.]+)/i,
+                        questionTemplate: "What are $1?",
+                        correctAnswer: "$2"
+                    },
+                    {
+                        pattern: /(\w+)\s+contains\s+([^,.]+)/i,
+                        questionTemplate: "What does $1 contain?",
+                        correctAnswer: "$2"
+                    }
+                ];
+
+                // Try to match patterns and generate questions
+                for (const template of templates) {
+                    const match = factText.match(template.pattern);
+                    if (match) {
+                        const question = template.questionTemplate.replace('$1', match[1]);
+                        const correctAnswer = template.correctAnswer.replace('$2', match[2]);
+                        
+                        return {
+                            question: question,
+                            options: this.generateOptionsForAnswer(correctAnswer, difficulty),
+                            correct: 0, // Correct answer is always first, then shuffled
+                            explanation: `Based on the fact: ${factText.substring(0, 100)}...`
+                        };
+                    }
+                }
+
+                // Fallback: create a generic question about the subject
+                return this.generateGenericQuestion(subject, difficulty, 1);
+            }
+
+            generateOptionsForAnswer(correctAnswer, difficulty) {
+                const options = [correctAnswer.trim()];
+                
+                // Generate plausible distractors based on difficulty
+                const distractors = this.generateDistractors(correctAnswer, difficulty);
+                options.push(...distractors);
+                
+                // Shuffle options
+                for (let i = options.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [options[i], options[j]] = [options[j], options[i]];
+                    
+                    // Keep track of where the correct answer ended up
+                    if (j === 0) {
+                        return { options, correctIndex: i };
+                    } else if (i === 0) {
+                        return { options, correctIndex: j };
+                    }
+                }
+                
+                // Find where the correct answer is now
+                const correctIndex = options.indexOf(correctAnswer.trim());
+                
+                return { 
+                    options: options.slice(0, 4), 
+                    correctIndex: correctIndex >= 0 ? correctIndex : 0 
+                };
+            }
+
+            generateDistractors(correctAnswer, difficulty) {
+                // Simple distractor generation
+                const distractors = [];
+                const baseWords = correctAnswer.split(' ');
+                
+                // Generate variations
+                if (difficulty === 'easy') {
+                    distractors.push('Not ' + correctAnswer);
+                    distractors.push('Opposite of ' + correctAnswer);
+                    distractors.push('Similar to ' + correctAnswer);
+                } else if (difficulty === 'medium') {
+                    distractors.push(baseWords[0] + ' alternative');
+                    distractors.push('Related ' + correctAnswer);
+                    distractors.push('Modified ' + correctAnswer);
+                } else {
+                    distractors.push('Complex ' + correctAnswer);
+                    distractors.push('Advanced ' + correctAnswer);
+                    distractors.push('Specialized ' + correctAnswer);
+                }
+                
+                return distractors.slice(0, 3);
+            }
+
+            generateGenericQuestion(subject, difficulty, questionNum) {
+                const questionTypes = [
+                    {
+                        template: `What is a key characteristic of ${subject}?`,
+                        options: [
+                            `${subject} has multiple important aspects`,
+                            `${subject} is completely theoretical`,
+                            `${subject} has no practical value`,
+                            `${subject} is outdated`
+                        ],
+                        correct: 0,
+                        explanation: `${subject} typically has various important characteristics and applications.`
+                    },
+                    {
+                        template: `Which statement best describes ${subject}?`,
+                        options: [
+                            `${subject} is a complex field with many applications`,
+                            `${subject} is simple and straightforward`,
+                            `${subject} has no real-world use`,
+                            `${subject} is only theoretical`
+                        ],
+                        correct: 0,
+                        explanation: `Most subjects, including ${subject}, tend to be complex with various practical applications.`
+                    },
+                    {
+                        template: `What is most important to understand about ${subject}?`,
+                        options: [
+                            `Its fundamental principles and applications`,
+                            `Only its historical context`,
+                            `Just memorizing facts`,
+                            `It's not worth studying`
+                        ],
+                        correct: 0,
+                        explanation: `Understanding both the fundamental principles and practical applications provides the best foundation for learning about ${subject}.`
+                    }
+                ];
+
+                const questionType = questionTypes[questionNum % questionTypes.length];
+                
+                return {
+                    question: questionType.template,
+                    options: questionType.options,
+                    correct: questionType.correct,
+                    explanation: questionType.explanation
+                };
+            }
+
+            startQuiz() {
+                document.getElementById('inputSection').style.display = 'none';
+                document.getElementById('loadingSection').style.display = 'none';
+                document.getElementById('errorSection').style.display = 'none';
+                document.getElementById('quizContainer').style.display = 'block';
+                
+                document.getElementById('quizTitle').textContent = document.getElementById('subjectInput').value + ' Quiz';
+                
+                this.currentQuestion = 0;
+                this.score = 0;
+                this.showQuestion();
+            }
+
+            showQuestion() {
+                const question = this.questions[this.currentQuestion];
+                const totalQuestions = this.questions.length;
+                
+                document.getElementById('questionNumber').textContent = `Question ${this.currentQuestion + 1}`;
+                document.getElementById('quizInfo').textContent = `Question ${this.currentQuestion + 1} of ${totalQuestions}`;
+                document.getElementById('progressFill').style.width = `${((this.currentQuestion + 1) / totalQuestions) * 100}%`;
+                document.getElementById('questionText').textContent = question.question;
+                
+                const optionsContainer = document.getElementById('optionsContainer');
+                optionsContainer.innerHTML = '';
+                
+                question.options.forEach((option, index) => {
+                    const optionElement = document.createElement('div');
+                    optionElement.className = 'option';
+                    optionElement.textContent = option;
+                    optionElement.addEventListener('click', () => this.selectAnswer(index, optionElement));
+                    optionsContainer.appendChild(optionElement);
+                });
+
+                this.selectedAnswer = null;
+                this.answered = false;
+                document.getElementById('nextBtn').disabled = true;
+                document.getElementById('showExplanationBtn').style.display = 'none';
+                document.getElementById('explanation').style.display = 'none';
+            }
+
+            selectAnswer(answerIndex, optionElement) {
+                if (this.answered) return;
+
+                document.querySelectorAll('.option').forEach(opt => opt.classList.remove('selected'));
+                optionElement.classList.add('selected');
+                
+                this.selectedAnswer = answerIndex;
+                this.answered = true;
+                
+                const question = this.questions[this.currentQuestion];
+                const isCorrect = answerIndex === question.correct;
+                
+                if (isCorrect) {
+                    this.score++;
+                    optionElement.classList.add('correct');
+                } else {
+                    optionElement.classList.add('incorrect');
+                    document.querySelectorAll('.option')[question.correct].classList.add('correct');
+                }
+
+                document.getElementById('nextBtn').disabled = false;
+                document.getElementById('showExplanationBtn').style.display = 'block';
+                document.getElementById('explanation').innerHTML = `<strong>Explanation:</strong> ${question.explanation}`;
+            }
+
+            toggleExplanation() {
+                const explanation = document.getElementById('explanation');
+                const btn = document.getElementById('showExplanationBtn');
+                
+                if (explanation.style.display === 'none' || explanation.style.display === '') {
+                    explanation.style.display = 'block';
+                    btn.textContent = 'Hide Explanation';
+                } else {
+                    explanation.style.display = 'none';
+                    btn.textContent = 'Show Explanation';
+                }
+            }
+
+            nextQuestion() {
+                if (this.currentQuestion < this.questions.length - 1) {
+                    this.currentQuestion++;
+                    this.showQuestion();
+                } else {
+                    this.showResults();
+                }
+            }
+
+            showResults() {
+                document.getElementById('quizContainer').style.display = 'none';
+                document.getElementById('resultsSection').style.display = 'block';
+                
+                const percentage = Math.round((this.score / this.questions.length) * 100);
+                document.getElementById('finalScore').textContent = `${this.score}/${this.questions.length}`;
+                
+                let message = '';
+                if (percentage >= 80) message = 'Excellent! You really know your stuff!';
+                else if (percentage >= 60) message = 'Good job! Keep up the learning!';
+                else if (percentage >= 40) message = 'Not bad! There\'s room for improvement.';
+                else message = 'Keep studying and try again!';
+                
+                document.getElementById('scoreMessage').textContent = message;
+            }
+
+            restart() {
+                document.getElementById('resultsSection').style.display = 'none';
+                document.getElementById('inputSection').style.display = 'block';
+                document.getElementById('subjectInput').value = '';
+                document.getElementById('subjectInput').focus();
+            }
+
+            showLoading() {
+                document.getElementById('inputSection').style.display = 'none';
+                document.getElementById('errorSection').style.display = 'none';
+                document.getElementById('loadingSection').style.display = 'block';
+            }
+
+            showError(message) {
+                document.getElementById('loadingSection').style.display = 'none';
+                document.getElementById('errorSection').style.display = 'block';
+                document.getElementById('errorSection').textContent = message;
+                document.getElementById('inputSection').style.display = 'block';
+            }
+        }
+
+        // Initialize the quiz generator when the page loads
+        window.addEventListener('DOMContentLoaded', () => {
+            new QuizGenerator();
+        });
+    </script>
+</body>
+</html>
